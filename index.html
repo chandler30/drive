@@ -55,7 +55,7 @@
                 
                 // Agregar evento click al póster para abrir el archivo HTML
                 poster.addEventListener('click', () => {
-                    window.open(filePath, '_blank');
+                    window.open(`${filePath}.html`, '_blank');
                 });
 
             } catch (error) {
