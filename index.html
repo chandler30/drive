@@ -34,6 +34,7 @@
         }
 
         async function fetchAndDisplayPoster(mediaId) {
+            const folderPath = './series';
             const tvId = mediaId.split('.')[0];
 
             try {
@@ -49,9 +50,12 @@
                 const posterContainer = document.getElementById('poster-container');
                 posterContainer.appendChild(poster);
 
+                // Construir la ruta del archivo HTML solo con el ID
+                const filePath = `${folderPath}/${mediaId}`;
+                
                 // Agregar evento click al póster para abrir el archivo HTML
                 poster.addEventListener('click', () => {
-                    window.open(`${mediaId}.html`, '_blank');
+                    window.open(`${filePath}.html`, '_blank');
                 });
 
             } catch (error) {
@@ -61,20 +65,27 @@
 
         async function fetchAndDisplayPostersFromFolder(folderPath) {
             try {
-                // Aquí puedes omitir el paso de obtener la lista de archivos del servidor
-                // ya que estás trabajando en un entorno estático
-                const mediaIds = ['73021.html', '12345.html']; // Ejemplo de IDs de medios
+                const response = await fetch(folderPath);
+                const text = await response.text();
 
-                for (const mediaId of mediaIds) {
-                    console.log("Fetching details for media ID:", mediaId);
-                    await fetchAndDisplayPoster(mediaId);
+                // Parsear la respuesta como HTML y extraer los enlaces a los archivos
+                const parser = new DOMParser();
+                const htmlDocument = parser.parseFromString(text, 'text/html');
+                const links = htmlDocument.querySelectorAll('a[href$=".html"]');
+
+                for (const link of links) {
+                    const url = link.getAttribute('href');
+                    const fileName = url.substring(url.lastIndexOf('/') + 1, url.lastIndexOf('.html'));
+                    console.log("Fetching details for media ID:", fileName);
+                    await fetchAndDisplayPoster(fileName);
                 }
             } catch (error) {
                 console.error("Error:", error);
             }
         }
 
-        fetchAndDisplayPostersFromFolder('./series'); // No necesitas la ruta del directorio en este contexto
+        const seriesFolderPath = './series'; // Ruta del directorio de series
+        fetchAndDisplayPostersFromFolder(seriesFolderPath);
     </script>
 </body>
 </html>
