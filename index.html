@@ -3,10 +3,97 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fetch and Display Posters</title>
+    <title>Backup Series</title>
 </head>
+<style>
+    body {
+        background-color: #1c1c1e; /* Color de fondo en modo oscuro */
+        color: #ffffff; /* Color de texto en modo oscuro */
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 0;
+    }
+
+    #poster-container {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 20px;
+        padding: 20px;
+    }
+
+    img {
+        max-width: 100%;
+        height: auto;
+        display: block;
+        border-radius: 8px; /* Agregamos bordes redondeados */
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* Agregamos sombra suave */
+    }
+
+    input[type="text"],
+    button {
+        padding: 10px 20px;
+        font-size: 16px;
+        border: none;
+        border-radius: 5px;
+        margin-right: 10px;
+    }
+
+    input[type="text"] {
+        background-color: #2c2c2e; /* Color de fondo para el campo de búsqueda */
+        color: #ffffff; /* Color de texto en modo oscuro */
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Agregamos sombra suave */
+    }
+
+    button {
+        background-color: #007aff; /* Color de fondo para el botón */
+        color: #ffffff; /* Color de texto en modo oscuro */
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+        background-color: #0056b3; /* Color de fondo para el botón al pasar el ratón */
+    }
+
+    button:focus {
+        outline: none;
+    }
+
+    .pagination {
+        display: flex;
+        justify-content: center;
+        margin-top: 20px;
+    }
+
+    .pagination button {
+        background-color: #007aff;
+        color: #ffffff;
+        cursor: pointer;
+        border: none;
+        border-radius: 5px;
+        padding: 5px 10px;
+        margin: 0 5px;
+    }
+
+    .pagination button:hover {
+        background-color: #0056b3;
+    }
+
+    .pagination button.active {
+        background-color: #0056b3;
+    }
+</style>
 <body>
+    <div>
+        <input type="text" id="search-input" placeholder="Search by series name">
+        <button id="search-button">Search</button>
+    </div>
     <div id="poster-container"></div>
+
+    <div class="pagination">
+        <button id="prev-button">Prev</button>
+        <button id="next-button">Next</button>
+    </div>
 
     <script>
         async function getMovieOrTVShowDetailsById(mediaId) {
@@ -33,37 +120,57 @@
             return data;
         }
 
-        async function fetchAndDisplayPoster(mediaId) {
-            const folderPath = './series';
-            const tvId = mediaId.split('.')[0];
+        async function fetchAndDisplayPoster(identifier) {
+    const folderPath = './series';
 
-            try {
-                console.log("Fetching details for media ID:", tvId);
-                const tvDetails = await getMovieOrTVShowDetailsById(tvId, 'tv');
-                console.log("Details fetched successfully:", tvDetails);
-                const posterPath = `https://image.tmdb.org/t/p/w500${tvDetails.poster_path}`;
-
-                const poster = document.createElement('img');
-                poster.src = posterPath;
-                poster.alt = tvDetails.name;
-
-                const posterContainer = document.getElementById('poster-container');
-                posterContainer.appendChild(poster);
-
-                // Construir la ruta del archivo HTML solo con el ID
-                const filePath = `${folderPath}/${mediaId}`;
-                
-                // Agregar evento click al póster para abrir el archivo HTML
-                poster.addEventListener('click', () => {
-                    window.open(`${filePath}.html`, '_blank');
-                });
-
-            } catch (error) {
-                console.error('Error:', error);
-            }
+    try {
+        let tvDetails;
+        if (!isNaN(identifier)) {
+            console.log("Fetching details for media ID:", identifier);
+            tvDetails = await getMovieOrTVShowDetailsById(identifier);
+        } else {
+            console.log("Searching for series with name:", identifier);
+            // Aquí debes implementar la lógica para buscar por nombre de serie
+            // Puedes usar la misma API o buscar en tu base de datos local
+            const response = await fetch(`${folderPath}/${identifier}.html`);
+            const text = await response.text();
+            const parser = new DOMParser();
+            const htmlDocument = parser.parseFromString(text, 'text/html');
+            const seriesName = htmlDocument.querySelector('h1');
+            tvDetails = { name: seriesName ? seriesName.textContent.trim() : '' };
         }
 
-        async function fetchAndDisplayPostersFromFolder(folderPath) {
+        const posterPath = `https://image.tmdb.org/t/p/w500${tvDetails.poster_path}`;
+
+        const poster = document.createElement('img');
+        poster.src = posterPath;
+        poster.alt = tvDetails.name;
+
+        const posterContainer = document.getElementById('poster-container');
+        const posterWrapper = document.createElement('div');
+        posterWrapper.classList.add('poster-wrapper');
+        posterWrapper.appendChild(poster);
+
+        const seriesName = document.createElement('p');
+        seriesName.textContent = tvDetails.name;
+        posterWrapper.appendChild(seriesName);
+
+       posterContainer.appendChild(posterWrapper);
+
+        // Construir la ruta del archivo HTML solo con el ID
+        const filePath = `${folderPath}/${identifier}`;
+
+        // Agregar evento click al póster para abrir el archivo HTML
+        poster.addEventListener('click', () => {
+            window.open(`${filePath}.html`, '_blank');
+        });
+
+    } catch (error) {
+        console.error('Error:', error);
+    }
+}
+
+        async function fetchAndDisplayPostersFromFolder(folderPath, page, pageSize) {
             try {
                 const response = await fetch(folderPath);
                 const text = await response.text();
@@ -73,7 +180,11 @@
                 const htmlDocument = parser.parseFromString(text, 'text/html');
                 const links = htmlDocument.querySelectorAll('a[href$=".html"]');
 
-                for (const link of links) {
+                const startIndex = (page - 1) * pageSize;
+                const endIndex = startIndex + pageSize;
+                const linksToDisplay = Array.from(links).slice(startIndex, endIndex);
+
+                for (const link of linksToDisplay) {
                     const url = link.getAttribute('href');
                     const fileName = url.substring(url.lastIndexOf('/') + 1, url.lastIndexOf('.html'));
                     console.log("Fetching details for media ID:", fileName);
@@ -85,7 +196,43 @@
         }
 
         const seriesFolderPath = './series'; // Ruta del directorio de series
-        fetchAndDisplayPostersFromFolder(seriesFolderPath);
+        const pageSize = 20; // Tamaño de página
+        let currentPage = 1; // Página actual
+
+        fetchAndDisplayPostersFromFolder(seriesFolderPath, currentPage, pageSize);
+
+        const searchButton = document.getElementById('search-button');
+        const searchInput = document.getElementById('search-input');
+        const prevButton = document.getElementById('prev-button');
+        const nextButton = document.getElementById('next-button');
+
+        searchButton.addEventListener('click', async () => {
+            const searchTerm = searchInput.value.trim();
+
+            if (searchTerm !== '') {
+                await fetchAndDisplayPoster(searchTerm);
+            }
+        });
+
+        prevButton.addEventListener('click', async () => {
+            if (currentPage > 1) {
+                currentPage--;
+                document.getElementById('poster-container').innerHTML = '';
+                fetchAndDisplayPostersFromFolder(seriesFolderPath, currentPage, pageSize);
+            }
+        });
+
+        nextButton.addEventListener('click', async () => {
+            currentPage++;
+            document.getElementById('poster-container').innerHTML = '';
+            fetchAndDisplayPostersFromFolder(seriesFolderPath, currentPage, pageSize);
+        });
+
+
+
+        
+
     </script>
 </body>
 </html>
+
